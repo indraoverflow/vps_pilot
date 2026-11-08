@@ -15,6 +15,7 @@ import (
 	"github.com/sanda0/vps_pilot/internal/handlers"
 	"github.com/sanda0/vps_pilot/internal/middleware"
 	"github.com/sanda0/vps_pilot/internal/services"
+	"github.com/sanda0/vps_pilot/internal/utils"
 )
 
 //go:embed all:dist
@@ -27,6 +28,7 @@ func hasEmbeddedUI() bool {
 }
 
 func Run(ctx context.Context, repo *db.Repo, port string, enroll services.AgentEnrollment, agents services.ProjectAgents, runner services.CommandRunner, logs services.LogReader, backups services.Backupper) {
+	utils.LogTokenConfigWarnings()
 
 	//init services
 	userService := services.NewUserService(ctx, repo)

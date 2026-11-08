@@ -33,25 +33,45 @@ func ExtractTokenFromHeader(c *gin.Context) string {
 // 	return ""
 // }
 
-func GenerateToken(user_id int32) (string, error) {
-	// Get token lifespan from env or use default (60 minutes)
-	token_lifespan := 60 // default 60 minutes
+const (
+	defaultTokenLifespan = 60
+	defaultTokenSecret   = "default-secret-change-in-production"
+)
+
+// tokenLifespan returns the configured token lifespan in minutes, falling back
+// to the default when unset or invalid.
+func tokenLifespan() int {
 	if lifespanStr := os.Getenv("TOKEN_LIFESPAN"); lifespanStr != "" {
 		if lifespan, err := strconv.Atoi(lifespanStr); err == nil {
-			token_lifespan = lifespan
-		} else {
-			log.Printf("Warning: Invalid TOKEN_LIFESPAN value '%s', using default %d minutes\n", lifespanStr, token_lifespan)
+			return lifespan
 		}
-	} else {
-		log.Printf("Warning: TOKEN_LIFESPAN not set, using default %d minutes\n", token_lifespan)
 	}
+	return defaultTokenLifespan
+}
 
-	// Get token secret from env or use default (for development only)
-	tokenSecret := os.Getenv("TOKEN_SECRET")
-	if tokenSecret == "" {
-		tokenSecret = "default-secret-change-in-production"
+func getTokenSecret() string {
+	if tokenSecret := os.Getenv("TOKEN_SECRET"); tokenSecret != "" {
+		return tokenSecret
+	}
+	return defaultTokenSecret
+}
+
+// LogTokenConfigWarnings reports token configuration problems once, at startup.
+func LogTokenConfigWarnings() {
+	if lifespanStr := os.Getenv("TOKEN_LIFESPAN"); lifespanStr == "" {
+		log.Printf("Warning: TOKEN_LIFESPAN not set, using default %d minutes\n", defaultTokenLifespan)
+	} else if _, err := strconv.Atoi(lifespanStr); err != nil {
+		log.Printf("Warning: Invalid TOKEN_LIFESPAN value '%s', using default %d minutes\n", lifespanStr, defaultTokenLifespan)
+	}
+	if os.Getenv("TOKEN_SECRET") == "" {
 		log.Println("Warning: TOKEN_SECRET not set, using default (INSECURE - set TOKEN_SECRET in production)")
 	}
+}
+
+func GenerateToken(user_id int32) (string, error) {
+	token_lifespan := tokenLifespan()
+
+	tokenSecret := getTokenSecret()
 
 	claims := jwt.MapClaims{}
 	claims["authorized"] = true
@@ -61,14 +81,6 @@ func GenerateToken(user_id int32) (string, error) {
 
 	return token.SignedString([]byte(tokenSecret))
 
-}
-
-func getTokenSecret() string {
-	tokenSecret := os.Getenv("TOKEN_SECRET")
-	if tokenSecret == "" {
-		return "default-secret-change-in-production"
-	}
-	return tokenSecret
 }
 
 func TokenValid(c *gin.Context) error {

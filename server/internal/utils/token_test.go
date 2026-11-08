@@ -55,3 +55,25 @@ func TestTokenRejected(t *testing.T) {
 		}
 	}
 }
+
+func TestTokenInvalidLifespanFallsBack(t *testing.T) {
+	t.Setenv("TOKEN_LIFESPAN", "not-a-number")
+	t.Setenv("TOKEN_SECRET", "test-secret")
+	token, err := GenerateToken(42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte("test-secret"), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := parsed.Claims.(jwt.MapClaims)
+	exp := int64(claims["exp"].(float64))
+	now := time.Now().Unix()
+	// default is 60 minutes
+	if exp < now+59*60 || exp > now+61*60 {
+		t.Fatalf("exp not within 60 min of now: got %d, want ~%d", exp, now+60*60)
+	}
+}
